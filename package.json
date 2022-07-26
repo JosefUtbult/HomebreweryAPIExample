@@ -1,0 +1,19 @@
+{
+  "name": "homebreweryapiexample",
+  "version": "1.0.0",
+  "description": "Example project for integrating with the homebrewery API",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/JosefUtbult/HomebreweryAPIExample.git"
+  },
+  "author": "Josef Utbult",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/JosefUtbult/HomebreweryAPIExample/issues"
+  },
+  "homepage": "https://github.com/JosefUtbult/HomebreweryAPIExample#readme"
+}
