@@ -1,14 +1,14 @@
-const http = require('http')
+var express = require('express');
+var app = express();
 
-const hostname = '127.0.0.1'
-const port = 3000
+app.use('/static', express.static('static'));
 
-const server = http.createServer((req, res) => {
-  res.statusCode = 200
-  res.setHeader('Content-Type', 'text/plain')
-  res.end('Hello World\n')
-})
+app.get('/', (req, res)=>{
+    res.sendFile('APIUsageExample.html', {'root': './content'});
+});
 
-server.listen(port, hostname, () => {
-  console.log(`Server running at http://${hostname}:${port}/`)
-})
+app.get('/favicon.ico',(req, res)=>{
+    res.sendFile('APIUsageExample.html', {'root': './content'});
+});
+
+app.listen(4000);

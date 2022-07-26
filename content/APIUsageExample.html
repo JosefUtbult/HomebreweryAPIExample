@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <!-- Font awesome (used by the snippets icons) -->
+        <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet"/>
+
+        <!-- Google fonts to make it more visually pleasing -->
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Cormorant+SC&family=Nanum+Gothic+Coding&display=swap" rel="stylesheet"> 
+
+        <!-- The style sheet for a specific theme. This is pulled from the homebrewery API -->
+        <link id="themeStyle" rel="stylesheet" type="text/css"/>
+
+        <script type="text/javascript" src="http://localhost:8000/api/homebreweryParser.js"></script>
+
+        <link rel="icon" href="/static/favicon.ico" type="image/x-icon" />
+    </head>
+    <body>
+        <div class="rootContainer">
+            <div style="width:40%;">
+                <h1>Testing the Homebrewery API</h1>
+                <h2>Set Theme</h2>
+                
+                <!-- Dropdown menu that is populated by the script later on with all themes available from the homebrewery API -->
+                <select id="themes-dropdown"  class="btn" name="themes-dropdown"></select>
+                <br>
+                <h3>Snippets</h3>
+
+                <!-- Snippets menu that is also populated by the script with all snippets categories and their snippets -->
+                <div id="snippetsMenu"></div>
+
+                <!-- Here is where the action happens! When the textarea changes in any way it will call the render function, which in -->
+                <!-- turn calls the render functionality from the homebrewery renderer -->
+                <textarea rows="20" cols="80" id="textInput" onchange="render();" onkeypress="render();" onpaste="render();" oninput="render();"></textarea>
+            </div>
+            <div style="width: 60%;">
+                <!-- This div is what is populated by the rendered markdown -->
+                <div id="renderedContent"></div>
+            </div>
+        </div>
+
+        <style>
+            body {
+                font-family: 'Cormorant SC', serif;
+            }
+
+            .rootContainer {
+                display: flex; 
+                flex-wrap: nowrap; 
+                justify-content: space-around; 
+                margin: 2% 10%;
+            }
+
+            #snippetsMenu {
+                display: flex; 
+                flex-wrap: noswrap; 
+                margin-right: 15%;
+            }
+
+            .btn {
+                background-color: rgb(247, 247, 247);
+                border-radius: 6px;
+                margin-bottom: 1vh;
+                font-family: inherit;
+            }
+
+            #textInput {
+                font-family: 'Nanum Gothic Coding', monospace;
+            }
+
+            .page {
+                margin-bottom: 2%;
+            }
+
+            #renderedContent {
+                height: 90vh;
+                width: 820px;
+                overflow-y: scroll; 
+                border: 1px solid rgb(243, 243, 243); 
+                padding: 5px; 
+                float: right
+            }
+        </style>
+
+        <script>
+            // The website that the application should get content from
+            // Here in the debug enviroment it is set to localhost
+            const HOMEBREWERY_URL = 'http://localhost:8000';
+            // But when deployed, the homebrewery site will work
+            //const HOMEBREWERY_URL = 'https://homebrewery.naturalcrit.com';
+
+            function render() {
+                const markdown = document.getElementById('textInput').value;
+                const result = homebreweryParser.render(markdown);
+                document.getElementById("renderedContent").innerHTML = result;
+            }
+
+            // Runs when the dropdown menu changes. Reads the current value of the dropdown menu and changes the stylesheet
+            // link to that value. The page then requests that stylesheet from the homebrewery API.
+            function setTheme() {
+                let dropdown = document.getElementById('themes-dropdown');
+                const path = dropdown.options[dropdown.selectedIndex].value;
+                document.getElementById('themeStyle').href = HOMEBREWERY_URL + '/api/themes/' + path + '/style';
+
+                const themesData = getThemesJSON();
+                let snippetsHtml = "";
+                let snippetsObject = themesData['homebrewery-themes'].find((instance)=>{return instance['path'] == path})['snippets'];
+                
+                // We only want to view the snippets for the markdown input field
+                snippetsObject = snippetsObject.filter((instance)=>{return instance['view'] == 'text'});
+
+                // Start by going through all groups of snippets
+                snippetsObject.forEach((group)=>{
+                    // Add group div. Tries to use the icons from fontawesome when possible
+                    snippetsHtml += `
+                        <div style="width: ${100 / snippetsObject.length}%;">
+                            <button class="btn" onclick="snippetsGroupDropdown('${group['path']}-content')">
+                                <i class="fa fa-solid ${group['icon']}"></i>
+                                ${group['groupName']}
+                            </button>
+                            <div id="${group['path']}-content" style="display: none;">
+                    `
+                    // Go through all snippets in group
+                    group['snippets'].forEach((snippet)=>{
+                        snippetsHtml += `
+                            <button class="btn" onclick="snippetsGroupDropdown('${group['path']}-content'); 
+                                applySnippet('${path}', '${group['path']}', '${snippet['path']}')">
+                                <i class="fa fa-solid ${snippet['icon']}"></i>
+                                ${snippet['name']}
+                            </button>
+                        `
+                    });
+
+                    snippetsHtml += `
+                            </div>
+                        </div>    
+                    `
+                });
+                document.getElementById("snippetsMenu").innerHTML = snippetsHtml;
+            }
+
+            // Toggle dropdown snippets in group on click
+            function snippetsGroupDropdown(id) {
+                if(document.getElementById(id).style.display != 'block'){
+                    document.getElementById(id).setAttribute('style', 'display: block');
+                }
+                else {
+                    document.getElementById(id).setAttribute('style', 'display: none');
+                }
+            }
+            
+            // Tries to run snippet from the homebrewery API, and puts the result in the text box
+            function applySnippet(themePath, snippetGroupPath, snippetPath) {
+                let getSnippet = new XMLHttpRequest();
+                getSnippet.open("POST", HOMEBREWERY_URL + "/api/themes/" + themePath + "/snippets/" + snippetGroupPath + "/" + snippetPath, false);
+                getSnippet.send();
+
+                document.getElementById('textInput').value += getSnippet.responseText;
+                render();
+            }
+
+            // Sets up the themes at page load. Requests the "themes" URL from the API, which returns a JSON file with 
+            // the names and paths to all themes, along with the names, icon names and paths for all snippets 
+            function setupThemes(){
+                const START_TEXT = `
+                    # Testing the Homebrewery API
+
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt 
+                    ut labore et dolore magna aliqua. Nulla facilisi etiam dignissim diam quis enim lobortis. 
+                    Porttitor leo a diam sollicitudin tempor id eu. At lectus urna duis convallis. Cras 
+                    pulvinar mattis nunc sed blandit libero volutpat. Velit egestas dui id ornare arcu odio 
+                    ut sem. Habitasse platea dictumst quisque sagittis purus. Convallis tellus id interdum 
+                    velit laoreet id donec ultrices. Eget mi proin sed libero enim sed faucibus turpis in. 
+                    Eu feugiat pretium nibh ipsum consequat nisl vel pretium lectus. Eros donec ac odio tempor 
+                    orci. Ultrices tincidunt arcu non sodales neque sodales ut etiam sit. Consequat ac felis 
+                    donec et odio pellentesque diam volutpat commodo. Egestas sed sed risus pretium quam 
+                    vulputate dignissim suspendisse. Orci a scelerisque purus semper eget duis at tellus at. 
+                    Amet nisl purus in mollis nunc sed id. Mi ipsum faucibus vitae aliquet.
+
+                    Aliquam malesuada bibendum arcu vitae elementum curabitur. Quis lectus nulla at volutpat 
+                    diam ut venenatis tellus in. Ipsum suspendisse ultrices gravida dictum fusce. Pharetra sit 
+                    amet aliquam id. Cursus turpis massa tincidunt dui ut ornare lectus sit. Dignissim diam 
+                    quis enim lobortis scelerisque fermentum dui faucibus. Mauris pellentesque pulvinar 
+                    pellentesque habitant morbi tristique senectus et. Donec ultrices tincidunt arcu non 
+                    sodales neque sodales ut. A erat nam at lectus urna duis. Lectus mauris ultrices eros in 
+                    cursus turpis. Felis imperdiet proin fermentum leo vel orci porta non. Vestibulum morbi 
+                    blandit cursus risus at ultrices mi tempus. Mollis nunc sed id semper risus in hendrerit 
+                    gravida rutrum.
+
+                    \\page
+                    ## Heading two
+                    
+                    Elementum tempus egestas sed sed risus pretium. Id velit ut tortor pretium viverra 
+                    suspendisse. Nisl vel pretium lectus quam. Egestas maecenas pharetra convallis posuere 
+                    morbi leo urna molestie. Interdum velit laoreet id donec ultrices. Augue lacus viverra 
+                    vitae congue eu consequat ac felis. Aliquet enim tortor at auctor urna. Tincidunt praesent 
+                    semper feugiat nibh sed pulvinar proin gravida hendrerit. Enim sit amet venenatis urna 
+                    cursus eget. Interdum varius sit amet mattis vulputate enim nulla aliquet porttitor. Nunc 
+                    faucibus a pellentesque sit amet porttitor. Ultrices vitae auctor eu augue. Arcu cursus 
+                    vitae congue mauris rhoncus aenean vel elit. Tellus mauris a diam maecenas sed enim.
+
+                    ![cat warrior](https://s-media-cache-ak0.pinimg.com/736x/4a/81/79/4a8179462cfdf39054a418efd4cb743e.jpg) {width:325px,mix-blend-mode:multiply}
+
+                    {{artist,position:relative,top:-230px,left:10px,margin-bottom:-30px
+                    ##### Cat Warrior
+                    [Kyoung Hwan Kim](https://www.artstation.com/tahra)
+                    }}
+                `;
+
+                const themesData = getThemesJSON();
+                let dropdownHtml = "";
+                themesData['homebrewery-themes'].forEach(theme => {
+                    dropdownHtml += '<option value = "' + theme['path'] + '">' + theme['name'] + '</option>'
+                });
+
+                document.getElementById('themes-dropdown').innerHTML = dropdownHtml;
+                document.getElementById('themeStyle').href = HOMEBREWERY_URL + '/api/themes/' + themesData['homebrewery-themes'][0]['path'] + '/style';
+                document.getElementById('themes-dropdown').onchange = setTheme;
+                setTheme();
+
+                // Strip the tabs from the beginning of each line and sets the value in the text input to an initial text
+                document.getElementById('textInput').value = START_TEXT.replace(/^\s*/gm, ``);
+            }
+
+            // Request a JSON object from the homebrewery API, containing all themes and their snippets
+            function getThemesJSON(){
+                // Synchronous requests are depricated, so it should not be used in production. In this example it
+                // simplifies things though
+                let readThemes = new XMLHttpRequest();
+                readThemes.open("POST", HOMEBREWERY_URL + "/api/themes", false);
+                readThemes.send();
+                return JSON.parse(readThemes.responseText);
+            }
+
+            setupThemes();
+            render();
+        </script>
+    </body>
+</html>
