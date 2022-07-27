@@ -7,8 +7,4 @@ app.get('/', (req, res)=>{
     res.sendFile('APIUsageExample.html', {'root': './content'});
 });
 
-app.get('/favicon.ico',(req, res)=>{
-    res.sendFile('APIUsageExample.html', {'root': './content'});
-});
-
 app.listen(4000);
