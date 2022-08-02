@@ -7,4 +7,4 @@ app.get('/', (req, res)=>{
     res.sendFile('APIUsageExample.html', {'root': './content'});
 });
 
-app.listen(4000);
+app.listen(3000);

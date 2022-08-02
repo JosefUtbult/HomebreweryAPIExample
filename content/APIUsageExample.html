@@ -9,8 +9,8 @@
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Cormorant+SC&family=Nanum+Gothic+Coding&display=swap" rel="stylesheet"> 
 
-        <!-- The style sheet for a specific theme. This is pulled from the homebrewery API -->
-        <link id="themeStyle" rel="stylesheet" type="text/css"/>
+        <!-- Here is where all theme stylesheets will be imported -->
+        <link id="theme-styles" rel="stylesheet">
 
         <script type="text/javascript" src="http://localhost:8000/api/homebreweryParser.js"></script>
 
@@ -96,36 +96,39 @@
                 document.getElementById("renderedContent").innerHTML = result;
             }
 
-            // Runs when the dropdown menu changes. Reads the current value of the dropdown menu and changes the stylesheet
-            // link to that value. The page then requests that stylesheet from the homebrewery API.
-            function setTheme() {
-                let dropdown = document.getElementById('themes-dropdown');
-                const path = dropdown.options[dropdown.selectedIndex].value;
-                document.getElementById('themeStyle').href = HOMEBREWERY_URL + '/api/themes/' + path + '/style';
+            function setStyleImports(theme) {
+                let themeStyles = document.getElementById('theme-styles');
+                themeStyles.href = HOMEBREWERY_URL + '/api/themes/' + theme + '/style.css';
+            }
 
-                const themesData = getThemesJSON();
-                let snippetsHtml = "";
-                let snippetsObject = themesData['homebrewery-themes'].find((instance)=>{return instance['path'] == path})['snippets'];
+            function setSnippetsMenu(theme) {
                 
+                let readThemeSnippets = new XMLHttpRequest();
+                readThemeSnippets.open("GET", `${HOMEBREWERY_URL}/api/themes/${theme}/snippets.json`, false);
+                readThemeSnippets.send();
+                let snippetsObject = JSON.parse(readThemeSnippets.responseText);
+                
+
                 // We only want to view the snippets for the markdown input field
                 snippetsObject = snippetsObject.filter((instance)=>{return instance['view'] == 'text'});
 
+                let snippetsHtml = '';
                 // Start by going through all groups of snippets
                 snippetsObject.forEach((group)=>{
                     // Add group div. Tries to use the icons from fontawesome when possible
                     snippetsHtml += `
                         <div style="width: ${100 / snippetsObject.length}%;">
-                            <button class="btn" onclick="snippetsGroupDropdown('${group['path']}-content')">
+                            <button class="btn" onclick="snippetsGroupDropdown('${group['groupName'].replace(' ', '-')}-content')">
                                 <i class="fa fa-solid ${group['icon']}"></i>
                                 ${group['groupName']}
                             </button>
-                            <div id="${group['path']}-content" style="display: none;">
+                            <div id="${group['groupName'].replace(' ', '-')}-content" style="display: none;">
                     `
                     // Go through all snippets in group
                     group['snippets'].forEach((snippet)=>{
                         snippetsHtml += `
-                            <button class="btn" onclick="snippetsGroupDropdown('${group['path']}-content'); 
-                                applySnippet('${path}', '${group['path']}', '${snippet['path']}')">
+                            <button class="btn" onclick="snippetsGroupDropdown('${group['groupName'].replace(' ', '-')}-content'); 
+                                applySnippet('${snippet['path']}')">
                                 <i class="fa fa-solid ${snippet['icon']}"></i>
                                 ${snippet['name']}
                             </button>
@@ -140,6 +143,17 @@
                 document.getElementById("snippetsMenu").innerHTML = snippetsHtml;
             }
 
+            // Runs when the dropdown menu changes. Reads the current value of the dropdown menu and changes the stylesheet
+            // link to that value. The page then requests that stylesheet from the homebrewery API.
+            function setTheme() {
+                let dropdown = document.getElementById('themes-dropdown');
+                const path = dropdown.options[dropdown.selectedIndex].value;
+                
+                setStyleImports(path);
+                setSnippetsMenu(path);
+
+            }
+
             // Toggle dropdown snippets in group on click
             function snippetsGroupDropdown(id) {
                 if(document.getElementById(id).style.display != 'block'){
@@ -151,9 +165,9 @@
             }
             
             // Tries to run snippet from the homebrewery API, and puts the result in the text box
-            function applySnippet(themePath, snippetGroupPath, snippetPath) {
+            function applySnippet(snippetPath) {
                 let getSnippet = new XMLHttpRequest();
-                getSnippet.open("POST", HOMEBREWERY_URL + "/api/themes/" + themePath + "/snippets/" + snippetGroupPath + "/" + snippetPath, false);
+                getSnippet.open("POST", snippetPath, false);
                 getSnippet.send();
 
                 document.getElementById('textInput').value += getSnippet.responseText;
@@ -215,7 +229,6 @@
                 });
 
                 document.getElementById('themes-dropdown').innerHTML = dropdownHtml;
-                document.getElementById('themeStyle').href = HOMEBREWERY_URL + '/api/themes/' + themesData['homebrewery-themes'][0]['path'] + '/style';
                 document.getElementById('themes-dropdown').onchange = setTheme;
                 setTheme();
 
@@ -228,7 +241,7 @@
                 // Synchronous requests are depricated, so it should not be used in production. In this example it
                 // simplifies things though
                 let readThemes = new XMLHttpRequest();
-                readThemes.open("POST", HOMEBREWERY_URL + "/api/themes", false);
+                readThemes.open("GET", HOMEBREWERY_URL + "/api/themes.json", false);
                 readThemes.send();
                 return JSON.parse(readThemes.responseText);
             }
